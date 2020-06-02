@@ -1,5 +1,6 @@
 [workspace]
 
 members = [ 
-    "list-list-and-more-list"
+    "list-list-and-more-list",
+    "algorithm-complexity-and-sorting-algorithms",
 ]
