@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 struct Node {
     value: i32,
-    next: Option<Rc<RefCell<Node>>>
+    next: Option<Rc<RefCell<Node>>>,
 }
 
 struct TransactonLog {
