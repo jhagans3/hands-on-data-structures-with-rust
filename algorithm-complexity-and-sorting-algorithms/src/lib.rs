@@ -103,6 +103,38 @@ pub fn quick_sort<T: PartialOrd + Debug>(v: &mut [T]) {
     quick_sort(&mut b[1..]);
 }
 
+pub fn threaded_quick_sort<T: 'static + PartialOrd + Debug + Send>(v: &mut [T]) {
+    if v.len() <= 1 {
+        return;
+    }
+
+    let p = pivot(v);
+    println!("{:?}", v);
+
+    let (a, b) = v.split_at_mut(p);
+
+    // explicit lifetime required in the type of `v`
+    // lifetime `'static` requiredrustc(E0621)
+    // lib.rs(106, 61): add explicit lifetime `'static` to the type of `v`
+
+    struct RawSend<T>(*mut [T]); // one element tuple
+    unsafe impl<T> Send for RawSend<T> {}
+
+    let raw_a: *mut [T] = a as *mut [T];
+    let raw_s = RawSend(raw_a);
+
+    // we call join in unsafe
+    unsafe {
+        let handle = std::thread::spawn(move || {
+            threaded_quick_sort(&mut *raw_s.0);
+        });
+
+        threaded_quick_sort(&mut b[1..]);
+
+        handle.join().ok();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,6 +183,25 @@ mod tests {
         // cargo test test_sorted_quick_sort -- --nocapture
         let mut v = vec![1, 2, 6, 7, 9, 12, 13, 14];
         quick_sort(&mut v);
+
+        let sorted_v = vec![1, 2, 6, 7, 9, 12, 13, 14];
+        assert_eq!(v, sorted_v);
+    }
+
+    #[test]
+    fn test_threaded_quick_sort() {
+        // cargo test test_threaded_quick_sort -- --nocapture
+        let mut v = vec![4, 6, 1, 8, 11, 13, 3];
+        threaded_quick_sort(&mut v);
+
+        let sorted_v = vec![1, 3, 4, 6, 8, 11, 13];
+        assert_eq!(v, sorted_v);
+    }
+    #[test]
+    fn test_threaded_sorted_quick_sort() {
+        // cargo test test_threaded_sorted_quick_sort -- --nocapture
+        let mut v = vec![1, 2, 6, 7, 9, 12, 13, 14];
+        threaded_quick_sort(&mut v);
 
         let sorted_v = vec![1, 2, 6, 7, 9, 12, 13, 14];
         assert_eq!(v, sorted_v);
