@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+mod b_rand;
+
 // Big O n^2
 pub fn bubble_sort<T: PartialOrd + Debug>(v: &mut [T]) {
     for p in 0..v.len() {
@@ -74,7 +76,10 @@ pub fn merge_sort<T: PartialOrd + Debug>(mut v: Vec<T>) -> Vec<T> {
 // else should be after
 // output is the pivot's location
 pub fn pivot<T: PartialOrd>(v: &mut [T]) -> usize {
-    let mut p = 0;
+    let mut p = b_rand::rand(v.len());
+    v.swap(p, 0);
+    p = 0;
+
     for i in 1..v.len() {
         if v[i] < v[p] {
             // move our pivot forward 1, and put this element before it
