@@ -122,11 +122,19 @@ fn main() {
     db.pop();
     println!("after pop, db: {:?}", db);
 
+    db.append(String::from("c"));
+    db.append(String::from("d"));
+    db.append(String::from("e"));
+    println!("after adding 'c' - 'e', db: {:#?}", db);
+
     let mut it = ListIterator::new(db.clone().head);
+    println!("db head {:?}", db.head);
+    println!("it head next {:?}", it.next());
     println!("it head next {:?}", it.next());
     println!("it head next back {:?}", it.next_back());
+    println!("it head next {:?}", it.next());
 
     let mut it = ListIterator::new(db.clone().tail);
     println!("it tail next back {:?}", it.next_back());
-    println!("it tail next {:?}", it.next());
+    println!("it tail next back {:?}", it.next_back());
 }
