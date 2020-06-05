@@ -37,6 +37,8 @@ impl TransactionLog {
 
     pub fn append(&mut self, value: String) {
         let new = Node::new(value);
+
+        // Takes the value out of the option, leaving a None in its place.
         match self.tail.take() {
             Some(old) => old.borrow_mut().next = Some(new.clone()),
             None => self.head = Some(new.clone()),
@@ -63,6 +65,7 @@ impl TransactionLog {
 }
 
 fn main() {
+    // cargo run --bin transaction_log
     let mut db = TransactionLog::new_empty();
 
     db.append(String::from("a"));
