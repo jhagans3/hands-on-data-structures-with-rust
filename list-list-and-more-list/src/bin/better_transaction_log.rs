@@ -110,6 +110,8 @@ impl DoubleEndedIterator for ListIterator {
 }
 
 fn main() {
+    // cargo run --bin better_transaction_log
+
     let mut db = BetterTransactionLog::new_empty();
 
     db.append(String::from("a"));
