@@ -2,5 +2,6 @@
 
 members = [ 
     "list-list-and-more-list",
+    "getting-to-grips-with-rust-and-its-syntax",
     "algorithm-complexity-and-sorting-algorithms",
 ]
