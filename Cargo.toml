@@ -7,4 +7,5 @@ members = [
     "getting-to-grips-with-rust-and-its-syntax",
     "algorithm-complexity-and-sorting-algorithms",
     "building-linked-lists-and-binary-trees",
+    "model-real-situations-as-graphs-of-connected-nodes",
 ]
