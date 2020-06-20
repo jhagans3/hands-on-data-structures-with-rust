@@ -9,7 +9,7 @@ pub fn rcc<T>(t: T) -> Rcc<T> {
 }
 
 // edge list
-pub struct EdgeListGraph {
+pub struct EdgeListGraph<E, ID> {
     // Data on the edges at E
     // dont care about the nodes
     // cheap storage slow traversal
@@ -22,7 +22,7 @@ pub struct EdgeListGraph {
 // if a node has been removed
 // can stick edge data if need
 pub struct RccGraph<T, E> {
-    nodes: Vec<Rcc<RccNode<T>>>,
+    nodes: Vec<Rcc<RccNode<T, E>>>,
 }
 
 pub struct RccNode<T, E> {
