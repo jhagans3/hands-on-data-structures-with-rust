@@ -1,3 +1,4 @@
+use rand::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
@@ -109,6 +110,7 @@ impl<T, E: Weighted, ID: Clone + Hash + Eq> Graph<T, E, ID> {
     pub fn shortest_path_route(&self, from: Rc<Route<ID>>, to: ID) -> Option<Rc<Route<ID>>> {
         let mut to_set = HashSet::new();
         to_set.insert(to);
+
         self.closest(from, &to_set)
     }
 
@@ -175,9 +177,63 @@ impl<T, E: Weighted, ID: Clone + Hash + Eq> Graph<T, E, ID> {
             route = self.closest(route, &to_visit)?;
             to_visit.remove(&route.pos);
         }
+
         self.shortest_path_route(route, start)
     }
+
+    pub fn complete_path(&self, path: &[ID]) -> Option<Rc<Route<ID>>> {
+        if path.len() < 2 {
+            return None;
+        }
+        let mut route = Route::start_rc(path[0].clone());
+        for pos in &path[1..path.len() - 1] {
+            if !route.contains(pos) {
+                route = self.shortest_path_route(route, pos.clone())?;
+            }
+        }
+
+        self.shortest_path_route(route, path[path.len() - 1].clone())
+    }
 }
+
+impl<T, E: Weighted, ID: Clone + Hash + Eq + fmt::Debug> Graph<T, E, ID> {
+    pub fn iter_salesman(&self, start: ID) -> Option<Rc<Route<ID>>> {
+        let mut best_path: Vec<ID> = self.data.keys().map(|k| k.clone()).collect();
+        best_path.shuffle(&mut rand::thread_rng());
+
+        // move start to front
+        for n in 0..best_path.len() {
+            if best_path[n] == start {
+                best_path.swap(0, n);
+                break;
+            }
+        }
+        //start and finish
+        best_path.push(start);
+
+        let mut best_route = self.complete_path(&best_path)?;
+        let mut no_improvements = 0;
+        loop {
+            let mut path2 = best_path.clone();
+            // not the ends
+            let swap_a = (rand::random::<usize>() % (path2.len() - 2)) + 1;
+            let swap_b = (rand::random::<usize>() % (path2.len() - 2)) + 1;
+            path2.swap(swap_a, swap_b);
+            let route2 = self.complete_path(&path2)?;
+            if route2.len < best_route.len {
+                println!("Improvement on {} = \n{}", best_route, route2);
+                best_path = path2;
+                best_route = route2;
+                no_improvements = 0;
+            }
+            no_improvements += 1;
+            if no_improvements >= 50 {
+                return Some(best_route);
+            }
+        }
+    }
+}
+
 fn main() -> Result<(), GraphErr> {
     // cargo run --bin graph
     let mut g = Graph::new();
@@ -201,6 +257,7 @@ fn main() -> Result<(), GraphErr> {
     println!("Shortes path H-B = {}", g.shortest_path('H', 'B').unwrap());
 
     println!("Greedy salesman A = {}", g.greedy_salesman('A').unwrap());
+    println!("Iter salesman A = {}", g.iter_salesman('A').unwrap());
 
     Ok(())
 }
