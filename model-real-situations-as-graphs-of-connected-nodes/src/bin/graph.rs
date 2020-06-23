@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -101,6 +101,62 @@ impl<T, E, ID: Clone + Hash + Eq> Graph<T, E, ID> {
     }
 }
 
+impl<T, E: Weighted, ID: Clone + Hash + Eq> Graph<T, E, ID> {
+    pub fn shortest_path(&self, from: ID, to: ID) -> Option<Rc<Route<ID>>> {
+        let mut visited = HashSet::new();
+        let mut routes = Vec::new();
+        routes.push(Route::start_rc(from));
+
+        loop {
+            let current_route = routes.pop()?;
+            if to == current_route.pos {
+                return Some(current_route);
+            }
+            if visited.contains(&current_route.pos) {
+                // no point in searching from the same place twice
+                continue;
+            }
+            visited.insert(current_route.pos.clone());
+
+            let exits = self.data.get(&current_route.pos)?;
+            for eid in &exits.1 {
+                let edge = self.edges.get(eid)?;
+                let npos = if edge.1 == current_route.pos {
+                    // opposite side of the edge to current pos
+                    edge.2.clone()
+                } else {
+                    edge.1.clone()
+                };
+                let nlen = current_route.len + edge.0.weight();
+                let nroute = Rc::new(Route {
+                    pos: npos,
+                    len: nlen,
+                    // increase the RC count
+                    path: Some(current_route.clone()),
+                });
+                if routes.len() == 0 {
+                    routes.push(nroute);
+                    continue;
+                }
+                // insert into the list sorted
+                let mut iafter = routes.len() - 1;
+                loop {
+                    if routes[iafter].len > nlen {
+                        // lowest element last
+                        routes.insert(iafter + 1, nroute);
+                        break;
+                    }
+                    if iafter == 0 {
+                        // reached end
+                        routes.insert(0, nroute);
+                        break;
+                    }
+                    iafter -= 1;
+                }
+            }
+        }
+    }
+}
 fn main() -> Result<(), GraphErr> {
     // cargo run --bin graph
     let mut g = Graph::new();
@@ -120,6 +176,8 @@ fn main() -> Result<(), GraphErr> {
     g.add_edge('j', 'C', 'E', 12)?;
 
     println!("Hello, graph {:?}", g);
+    println!("Shortes path A-D = {}", g.shortest_path('A', 'D').unwrap());
+    println!("Shortes path H-B = {}", g.shortest_path('H', 'B').unwrap());
 
     Ok(())
 }
