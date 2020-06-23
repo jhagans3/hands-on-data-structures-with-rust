@@ -103,13 +103,23 @@ impl<T, E, ID: Clone + Hash + Eq> Graph<T, E, ID> {
 
 impl<T, E: Weighted, ID: Clone + Hash + Eq> Graph<T, E, ID> {
     pub fn shortest_path(&self, from: ID, to: ID) -> Option<Rc<Route<ID>>> {
+        self.shortest_path_route(Route::start_rc(from), to)
+    }
+
+    pub fn shortest_path_route(&self, from: Rc<Route<ID>>, to: ID) -> Option<Rc<Route<ID>>> {
+        let mut to_set = HashSet::new();
+        to_set.insert(to);
+        self.closest(from, &to_set)
+    }
+
+    pub fn closest(&self, from: Rc<Route<ID>>, to: &HashSet<ID>) -> Option<Rc<Route<ID>>> {
         let mut visited = HashSet::new();
         let mut routes = Vec::new();
-        routes.push(Route::start_rc(from));
+        routes.push(from);
 
         loop {
             let current_route = routes.pop()?;
-            if to == current_route.pos {
+            if to.contains(&current_route.pos) {
                 return Some(current_route);
             }
             if visited.contains(&current_route.pos) {
@@ -156,6 +166,17 @@ impl<T, E: Weighted, ID: Clone + Hash + Eq> Graph<T, E, ID> {
             }
         }
     }
+
+    pub fn greedy_salesman(&self, start: ID) -> Option<Rc<Route<ID>>> {
+        let mut to_visit: HashSet<ID> = self.data.keys().map(|k| k.clone()).collect();
+        to_visit.remove(&start);
+        let mut route = Route::start_rc(start.clone());
+        while to_visit.len() > 0 {
+            route = self.closest(route, &to_visit)?;
+            to_visit.remove(&route.pos);
+        }
+        self.shortest_path_route(route, start)
+    }
 }
 fn main() -> Result<(), GraphErr> {
     // cargo run --bin graph
@@ -178,6 +199,8 @@ fn main() -> Result<(), GraphErr> {
     println!("Hello, graph {:?}", g);
     println!("Shortes path A-D = {}", g.shortest_path('A', 'D').unwrap());
     println!("Shortes path H-B = {}", g.shortest_path('H', 'B').unwrap());
+
+    println!("Greedy salesman A = {}", g.greedy_salesman('A').unwrap());
 
     Ok(())
 }
