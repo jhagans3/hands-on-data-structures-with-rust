@@ -8,5 +8,5 @@ members = [
     "algorithm-complexity-and-sorting-algorithms",
     "building-linked-lists-and-binary-trees",
     "model-real-situations-as-graphs-of-connected-nodes",
-    "getting-constant-time-data-access-using-hashMap",
+    "getting-constant-time-data-access-using-hash_map",
 ]
