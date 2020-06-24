@@ -4,6 +4,9 @@ use hasher::hash;
 use std::borrow::Borrow;
 use std::hash::Hash;
 
+const BUCKET_SIZE: usize = 8;
+const BUCKET_GROW: usize = 8;
+
 #[derive(Debug)]
 pub struct BucketList<K, V> {
     seed: u64,
@@ -72,6 +75,87 @@ impl<K: Hash + Eq, V> BucketList<K, V> {
         for _ in self.buckets.len()..n {
             self.buckets.push(Vec::new())
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct HMap<K, V> {
+    n_moved: usize,
+    main: BucketList<K, V>,
+    grow: BucketList<K, V>,
+}
+
+impl<K: Hash + Eq, V> HMap<K, V> {
+    pub fn new() -> Self {
+        HMap {
+            n_moved: 0,
+            main: BucketList::new(),
+            grow: BucketList::new(),
+        }
+    }
+
+    pub fn insert(&mut self, k: K, v: V) {
+        if let Some(iv) = self.main.get_mut(&k) {
+            *iv = v;
+            return;
+        }
+        if let Some(iv) = self.grow.get_mut(&k) {
+            *iv = v;
+            return;
+        }
+
+        if self.n_moved > 0 {
+            // we have started move to bigger bucket
+            self.grow.push(k, v);
+            self.move_bucket();
+            return;
+        }
+
+        if self.main.push(k, v) > BUCKET_SIZE / 2 {
+            // grow buckets
+            self.move_bucket();
+        }
+    }
+
+    pub fn get<KR>(&self, kr: &KR) -> Option<&V>
+    where
+        K: Borrow<KR>,
+        KR: Hash + Eq + ?Sized,
+    {
+        self.main.get(kr).or_else(|| self.grow.get(kr))
+    }
+
+    pub fn get_mut<KR>(&mut self, kr: &KR) -> Option<&mut V>
+    where
+        K: Borrow<KR>,
+        KR: Hash + Eq + ?Sized,
+    {
+        if let Some(b) = self.main.get_mut(kr) {
+            return Some(b);
+        }
+        self.grow.get_mut(kr)
+    }
+
+    pub fn len(&self) -> usize {
+        self.main.len + self.grow.len
+    }
+
+    pub fn move_bucket(&mut self) {
+        if self.n_moved == 0 {
+            self.grow.set_buckets(self.main.buckets.len() + BUCKET_GROW);
+        }
+        if let Some(b) = self.main.bucket(self.n_moved) {
+            for (k, v) in b {
+                self.grow.push(k, v);
+            }
+            self.n_moved += 1;
+            return;
+        }
+
+        // if all data out of main and into grow
+        // then grow is main
+        std::mem::swap(&mut self.main, &mut self.grow);
+        self.n_moved = 0;
     }
 }
 
