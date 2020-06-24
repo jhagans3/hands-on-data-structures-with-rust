@@ -1,5 +1,5 @@
 [package]
-name = "getting-constant-time-data-access-using-hash_map"
+name = "getting-constant-time-data-access-using-hash-map"
 version = "0.1.0"
 authors = ["James Hagans <jhagans@acm.org>"]
 edition = "2018"
