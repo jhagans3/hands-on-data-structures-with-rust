@@ -44,7 +44,7 @@ pub fn dir_sys<D: EcsStore<Direction>, P: EcsStore<Position>>(dir_list: &mut D, 
                 dr.velocity_x = -1
             }
             if p.y + 4 > h {
-                dr.velocity_x = -1
+                dr.velocity_y = -1
             }
         }
     });
@@ -76,15 +76,17 @@ pub fn collision_sys<P: EcsStore<Position>, S: EcsStore<Strength>>(
                 n
             } else {
                 0
-            };
-
-            if health_up > 0 {
-                if let Some(bumper) = strength_list.get_mut(outer_gen) {
-                    bumper.health += health_up;
-                    bumper.strength += 1;
-                }
             }
+        } else {
+            0
         };
+
+        if health_up > 0 {
+            if let Some(bumper) = strength_list.get_mut(outer_gen) {
+                bumper.health += health_up;
+                bumper.strength += 1;
+            }
+        }
     }
 }
 
