@@ -1,57 +1,90 @@
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct GenerationData {
-    position: usize,
-    generation: u64,
+use crate::gen::GenerationData;
+
+// This could be implemented by Vec type object
+// or tree or hashmap depending on how full
+// you expect it to be
+pub trait EcsStore<T> {
+    fn add(&mut self, genData: GenerationData, data: T);
+    fn get(&self, genData: GenerationData) -> Option<&T>;
+    fn get_mut(&mut self, genData: GenerationData) -> Option<&mut T>;
+    fn drop(&mut self, genData: GenerationData);
+
+    // Optional, could be impl by iter trait
+    fn for_each<F: FnMut(GenerationData, &T)>(&self, f: F);
+    fn for_each_mut<F: FnMut(GenerationData, &mut T)>(&mut self, f: F);
 }
 
-pub struct EntityActive {
-    active: bool,
-    generation: u64,
+pub struct VecStore<T> {
+    items: Vec<Option<(u64, T)>>,
 }
 
-// where we get new GenerationIDs from
-pub struct GenerationManager {
-    items: Vec<EntityActive>,
-    // list of all dropped entities
-    drops: Vec<usize>,
-}
-
-impl GenerationManager {
+impl<T> VecStore<T> {
     pub fn new() -> Self {
-        GenerationManager {
-            items: Vec::new(),
-            drops: Vec::new(),
+        VecStore { items: Vec::new() }
+    }
+}
+
+impl<T> EcsStore<T> for VecStore<T> {
+    fn add(&mut self, genData: GenerationData, data: T) {
+        while genData.position >= self.items.len() {
+            self.items.push(None);
+        }
+        self.items[genData.position] = Some((genData.generation, data));
+    }
+
+    fn get(&self, genData: GenerationData) -> Option<&T> {
+        // get returns option, vec holds options
+        if let Some(Some((innerGen, data))) = self.items.get(genData.position) {
+            if *innerGen == genData.generation {
+                return Some(data);
+            }
+        }
+
+        None
+    }
+
+    fn get_mut(&mut self, gen_data: GenerationData) -> Option<&mut T> {
+        if let Some(Some((inner_gen, data))) = self.items.get_mut(gen_data.position) {
+            if *inner_gen == gen_data.generation {
+                return Some(data);
+            }
+        }
+
+        None
+    }
+
+    fn drop(&mut self, gen_data: GenerationData) {
+        if let Some(Some((inner_gen, _))) = self.items.get(gen_data.position) {
+            if *inner_gen == gen_data.generation {
+                self.items[gen_data.position] = None;
+            }
         }
     }
 
-    pub fn next(&mut self) -> GenerationData {
-        if let Some(location) = self.drops.pop() {
-            // most recent drop
-            let ea = &mut self.items[location];
-            ea.active = true;
-            ea.generation += 1;
-            return GenerationData {
-                position: location,
-                generation: ea.generation,
-            };
+    fn for_each<F: FnMut(GenerationData, &T)>(&self, mut f: F) {
+        for (num, idx) in self.items.iter().enumerate() {
+            if let Some((inner_gen, data)) = idx {
+                f(
+                    GenerationData {
+                        generation: *inner_gen,
+                        position: num,
+                    },
+                    data,
+                );
+            }
         }
-        //if noting in the drops vec, add on the end
-        self.items.push(EntityActive {
-            active: true,
-            generation: 0,
-        });
-        return GenerationData {
-            position: self.items.len() - 1,
-            generation: 0,
-        };
     }
 
-    pub fn drop(&mut self, genData: GenerationData) {
-        if let Some(ea) = self.items.get_mut(genData.position) {
-            if ea.active && ea.generation == genData.generation {
-                // do not drop newer items than the given
-                ea.active = false;
-                self.drops.push(genData.position);
+    fn for_each_mut<F: FnMut(GenerationData, &mut T)>(&mut self, mut f: F) {
+        for (num, idx) in self.items.iter_mut().enumerate() {
+            if let Some((inner_gen, data)) = idx {
+                f(
+                    GenerationData {
+                        generation: *inner_gen,
+                        position: num,
+                    },
+                    data,
+                );
             }
         }
     }
@@ -60,30 +93,26 @@ impl GenerationManager {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::gen::{GenerationData, GenerationManager};
+
     #[test]
-    fn test_items_drop() {
+    fn test_store_can_drop() {
         let mut gm = GenerationManager::new();
+        let mut vs = VecStore::new();
 
-        let g = gm.next();
-        assert_eq!(
-            g,
-            GenerationData {
-                generation: 0,
-                position: 0,
-            }
-        );
-        let g2 = gm.next();
-        gm.next();
-        gm.next();
-        gm.drop(g2);
-        let g3 = gm.next();
+        vs.add(gm.next(), 5);
+        vs.add(gm.next(), 3);
+        vs.add(gm.next(), 2);
 
-        assert_eq!(
-            g3,
-            GenerationData {
-                generation: 1,
-                position: 1,
-            }
-        );
+        let g4 = gm.next();
+        vs.add(g4, 5);
+
+        vs.for_each_mut(|g, d| *d += 2);
+
+        assert_eq!(vs.get(g4), Some(&7));
+
+        vs.drop(g4);
+
+        assert_eq!(vs.get(g4), None);
     }
 }
