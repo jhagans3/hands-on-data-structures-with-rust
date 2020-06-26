@@ -29,7 +29,7 @@ impl BlobStore {
             .open(fname)?;
 
         let f = &mut ff;
-        f.set_len(CONTROL_DATA_SIZE + block_size * nblocks);
+        f.set_len(CONTROL_DATA_SIZE + block_size * nblocks)?;
         f.seek(SeekFrom::Start(0))?;
         write_u64(f, hseed)?;
         write_u64(f, block_size)?;
@@ -103,7 +103,7 @@ impl BlobStore {
         let bucket = blob.k_hash(self.hseed) % self.nblocks;
         let f = &mut self.file;
         let mut pos = f.seek(SeekFrom::Start(
-            CONTROL_DATA_SIZE + self.block_size + bucket,
+            CONTROL_DATA_SIZE + self.block_size * bucket,
         ))?;
 
         // start each loop at the beginning of an elem
@@ -122,6 +122,33 @@ impl BlobStore {
                 write_u64(f, (vlen - blob.len()) - 16)?;
                 return Ok(());
             }
+            pos = f.seek(SeekFrom::Start(pos + 16 + klen + vlen))?;
+        }
+    }
+
+    pub fn b_start(&self, b: u64) -> u64 {
+        CONTROL_DATA_SIZE + self.block_size * b
+    }
+
+    pub fn get<K: Serialize>(&mut self, k: &K) -> Result<Blob, BlobError> {
+        let s_blob = Blob::from(k, &0)?;
+        let bucket = s_blob.k_hash(self.hseed) % self.nblocks;
+        let b_start = self.b_start(bucket);
+        let b_end = self.b_start(bucket + 1);
+        let f = &mut self.file;
+        let mut pos = f.seek(SeekFrom::Start(b_start))?;
+        loop {
+            if pos >= b_end {
+                // Result<Option> is also possible instead of
+                return Err(BlobError::NotFound);
+            }
+
+            // for very large blobs optimize by reading until the key vs the whole blob
+            let b = Blob::read(f)?;
+            if b.key_match(&s_blob) {
+                return Ok(b);
+            }
+            pos += b.len();
         }
     }
 }
@@ -142,5 +169,17 @@ mod test {
 
         b2.insert_only("fish", "so long and thanks for all the fish")
             .unwrap();
+        b2.insert_only(23, "a big number for small counters")
+            .unwrap();
+        b2.insert_only("green", "is a color I guess").unwrap();
+        b2.insert_only("happy", "is friends with sleepy").unwrap();
+
+        drop(b2);
+
+        let mut b3 = BlobStore::open(fs).unwrap();
+        assert_eq!(
+            b3.get(&"green").unwrap().get_v::<String>().unwrap(),
+            "is a color I guess".to_string()
+        );
     }
 }
