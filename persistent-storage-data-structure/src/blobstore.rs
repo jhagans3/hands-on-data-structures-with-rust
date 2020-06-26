@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom};
 
@@ -92,6 +93,37 @@ impl BlobStore {
 
         Ok(())
     }
+
+    fn insert_only<K: Serialize, V: Serialize>(&mut self, k: K, v: V) -> Result<(), BlobError> {
+        let blob = Blob::from(&k, &v)?;
+        if blob.len() > self.block_size {
+            // Let the wrapper make a file with a bigger group
+            return Err(BlobError::TooBig(blob.len()));
+        }
+        let bucket = blob.k_hash(self.hseed) % self.nblocks;
+        let f = &mut self.file;
+        let mut pos = f.seek(SeekFrom::Start(
+            CONTROL_DATA_SIZE + self.block_size + bucket,
+        ))?;
+
+        // start each loop at the beginning of an elem
+        // remember klen == 0 means an empty section
+        loop {
+            if pos > CONTROL_DATA_SIZE + self.block_size * (bucket + 1) {
+                return Err(BlobError::NoRoom);
+            }
+            let klen = read_u64(f)?;
+            let vlen = read_u64(f)?;
+            if klen == 0 && blob.len() < vlen {
+                f.seek(SeekFrom::Start(pos))?;
+                blob.out(f)?;
+                // add pointer immediatly after data ends
+                write_u64(f, 0)?;
+                write_u64(f, (vlen - blob.len()) - 16)?;
+                return Ok(());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -107,5 +139,8 @@ mod test {
 
         let mut b2 = BlobStore::open(fs).unwrap();
         assert_eq!(b2.block_size, block_size);
+
+        b2.insert_only("fish", "so long and thanks for all the fish")
+            .unwrap();
     }
 }
