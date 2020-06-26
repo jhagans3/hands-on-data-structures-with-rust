@@ -10,4 +10,5 @@ members = [
     "model-real-situations-as-graphs-of-connected-nodes",
     "getting-constant-time-data-access-using-hash-map",
     "organizing-your-data-by-type-with-entity-component-systems",
+    "persistent-storage-data-structure",
 ]

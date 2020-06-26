@@ -1,6 +1,6 @@
 mod hasher;
 
-use hasher::hash;
+pub use hasher::hash;
 use std::borrow::Borrow;
 use std::hash::Hash;
 
