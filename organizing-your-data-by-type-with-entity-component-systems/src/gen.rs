@@ -46,12 +46,12 @@ impl GenerationManager {
         };
     }
 
-    pub fn drop(&mut self, genData: GenerationData) {
-        if let Some(ea) = self.items.get_mut(genData.position) {
-            if ea.active && ea.generation == genData.generation {
+    pub fn drop(&mut self, gen_data: GenerationData) {
+        if let Some(ea) = self.items.get_mut(gen_data.position) {
+            if ea.active && ea.generation == gen_data.generation {
                 // do not drop newer items than the given
                 ea.active = false;
-                self.drops.push(genData.position);
+                self.drops.push(gen_data.position);
             }
         }
     }

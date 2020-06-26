@@ -17,4 +17,4 @@ failure_derive = "0.1.8"
 
 rand = "0.7.3"
 
-getting-constant-time-data-access-using-hash-map= {path="../getting-constant-time-data-access-using-hash-map/"}
+my_hash_map= {package = "getting-constant-time-data-access-using-hash-map", path="../getting-constant-time-data-access-using-hash-map/"}

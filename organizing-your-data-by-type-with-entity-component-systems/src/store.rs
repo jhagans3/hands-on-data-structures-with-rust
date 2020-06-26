@@ -4,10 +4,10 @@ use crate::gen::GenerationData;
 // or tree or hashmap depending on how full
 // you expect it to be
 pub trait EcsStore<T> {
-    fn add(&mut self, genData: GenerationData, data: T);
-    fn get(&self, genData: GenerationData) -> Option<&T>;
-    fn get_mut(&mut self, genData: GenerationData) -> Option<&mut T>;
-    fn drop(&mut self, genData: GenerationData);
+    fn add(&mut self, gen_data: GenerationData, data: T);
+    fn get(&self, gen_data: GenerationData) -> Option<&T>;
+    fn get_mut(&mut self, gen_data: GenerationData) -> Option<&mut T>;
+    fn drop(&mut self, gen_data: GenerationData);
 
     // Optional, could be impl by iter trait
     fn for_each<F: FnMut(GenerationData, &T)>(&self, f: F);
@@ -25,17 +25,17 @@ impl<T> VecStore<T> {
 }
 
 impl<T> EcsStore<T> for VecStore<T> {
-    fn add(&mut self, genData: GenerationData, data: T) {
-        while genData.position >= self.items.len() {
+    fn add(&mut self, gen_data: GenerationData, data: T) {
+        while gen_data.position >= self.items.len() {
             self.items.push(None);
         }
-        self.items[genData.position] = Some((genData.generation, data));
+        self.items[gen_data.position] = Some((gen_data.generation, data));
     }
 
-    fn get(&self, genData: GenerationData) -> Option<&T> {
+    fn get(&self, gen_data: GenerationData) -> Option<&T> {
         // get returns option, vec holds options
-        if let Some(Some((innerGen, data))) = self.items.get(genData.position) {
-            if *innerGen == genData.generation {
+        if let Some(Some((inner_gen, data))) = self.items.get(gen_data.position) {
+            if *inner_gen == gen_data.generation {
                 return Some(data);
             }
         }
@@ -93,7 +93,7 @@ impl<T> EcsStore<T> for VecStore<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::gen::{GenerationData, GenerationManager};
+    use crate::gen::GenerationManager;
 
     #[test]
     fn test_store_can_drop() {
