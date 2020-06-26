@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom};
 
@@ -94,6 +94,11 @@ impl BlobStore {
         Ok(())
     }
 
+    pub fn insert<K: Serialize, V: Serialize>(&mut self, k: K, v: V) -> Result<(), BlobError> {
+        self.remove(&k).ok();
+        self.insert_only(k, v)
+    }
+
     fn insert_only<K: Serialize, V: Serialize>(&mut self, k: K, v: V) -> Result<(), BlobError> {
         let blob = Blob::from(&k, &v)?;
         if blob.len() > self.block_size {
@@ -110,6 +115,10 @@ impl BlobStore {
         // remember klen == 0 means an empty section
         loop {
             if pos > CONTROL_DATA_SIZE + self.block_size * (bucket + 1) {
+                // reached end of the data block
+                // consider other handlings but this will tell the
+                // wrapper to make space
+                // another option is to overflow onto the end of the file
                 return Err(BlobError::NoRoom);
             }
             let klen = read_u64(f)?;
@@ -117,9 +126,10 @@ impl BlobStore {
             if klen == 0 && blob.len() < vlen {
                 f.seek(SeekFrom::Start(pos))?;
                 blob.out(f)?;
-                // add pointer immediatly after data ends
+                // add pointer immediately after data ends
                 write_u64(f, 0)?;
                 write_u64(f, (vlen - blob.len()) - 16)?;
+                self.inc_elems(1)?;
                 return Ok(());
             }
             pos = f.seek(SeekFrom::Start(pos + 16 + klen + vlen))?;
@@ -149,6 +159,44 @@ impl BlobStore {
                 return Ok(b);
             }
             pos += b.len();
+        }
+    }
+
+    pub fn remove<K: Serialize>(&mut self, k: &K) -> Result<(), BlobError> {
+        let s_blob = Blob::from(k, &0)?;
+        let bucket = s_blob.k_hash(self.hseed) % self.nblocks;
+        let b_start = self.b_start(bucket);
+        let b_end = self.b_start(bucket + 1);
+        let f = &mut self.file;
+        let mut pos = f.seek(SeekFrom::Start(b_start))?;
+        loop {
+            if pos >= b_end {
+                return Ok(());
+            }
+            let b = Blob::read(f)?;
+            if b.key_match(&s_blob) {
+                // item found
+                let l = b.len();
+                // if next block is empty, we should join the two blocks
+                if pos + l < b_end {
+                    if read_u64(f)? == 0 {
+                        let nlen = read_u64(f)?;
+                        f.seek(SeekFrom::Start(pos))?;
+                        write_u64(f, 0)?;
+                        write_u64(f, l + nlen + 16)?;
+
+                        return Ok(());
+                    }
+                }
+                // otherwise, just leave empty
+                f.seek(SeekFrom::Start(pos))?;
+                write_u64(f, 0)?;
+                write_u64(f, l - 16)?;
+                self.inc_elems(-1)?;
+
+                return Ok(());
+            }
+            pos = f.seek(SeekFrom::Start(pos + b.len()))?;
         }
     }
 }
@@ -181,5 +229,9 @@ mod test {
             b3.get(&"green").unwrap().get_v::<String>().unwrap(),
             "is a color I guess".to_string()
         );
+
+        b3.remove(&"green").ok();
+        assert!(b3.get(&"green").is_err());
+        assert!(b3.get(&"fish").is_ok());
     }
 }
